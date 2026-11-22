@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>抓取隔离舱检疫台</title>
+  <link rel="stylesheet" href="/static/css/quarantine.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div>
+        <strong>抓取隔离舱检疫台</strong>
+        <span class="muted" id="dashHint"></span>
+      </div>
+      <button id="logoutBtn" class="ghost">退出</button>
+    </header>
+    <div class="main">
+      <section id="view" class="view"></section>
+      <aside class="drawer">
+        <button data-page="captures" data-tab="captures" class="nav active">抓取批次</button>
+        <button data-page="bins" data-tab="bins" class="nav">隔离舱</button>
+        <button data-page="review" data-tab="review" class="nav">复核放行</button>
+        <button data-page="rework" data-tab="rework" class="nav">回炉队列</button>
+        <button data-page="reconcile" data-tab="reconcile" class="nav">隔离对账</button>
+        <button data-page="sources" data-tab="sources" class="nav">源站名册</button>
+        <button data-page="policies" data-tab="policies" class="nav">入舱规则</button>
+        <button data-page="audit" data-tab="audit" class="nav">审计轨迹</button>
+        <button data-page="settings" data-tab="settings" class="nav">台参数</button>
+      </aside>
+    </div>
+  </div>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

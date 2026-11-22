@@ -1,0 +1,5 @@
+pyramid>=2.0,<3
+waitress>=3.0,<4
+itsdangerous>=2.2,<3
+pytest>=8.0,<9
+httpx>=0.27,<1
