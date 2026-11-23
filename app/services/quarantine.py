@@ -12,7 +12,8 @@ def list_bins(db_path: str | None = None) -> list[dict]:
             """
             SELECT b.*,
               (SELECT COUNT(*) FROM quarantine_rows r WHERE r.bin_id=b.id AND r.status='待复核') AS pending_count,
-              (SELECT COUNT(*) FROM quarantine_rows r WHERE r.bin_id=b.id) AS row_count
+              (SELECT COUNT(*) FROM quarantine_rows r WHERE r.bin_id=b.id) AS row_count,
+              (SELECT COUNT(*) FROM page_merge_rows pmr WHERE pmr.bin_id=b.id) AS landing_count
             FROM quarantine_bins b ORDER BY b.id
             """
         ).fetchall()
@@ -21,10 +22,17 @@ def list_bins(db_path: str | None = None) -> list[dict]:
 
 def list_rows(bin_id: int | None = None, db_path: str | None = None) -> list[dict]:
     with get_db(db_path) as conn:
+        merge_cols = """
+              (SELECT m.merge_key FROM page_merges m
+                WHERE m.batch_id=i.batch_id ORDER BY m.id DESC LIMIT 1) AS merge_key,
+              (SELECT pmr.id FROM page_merge_rows pmr
+                WHERE pmr.item_id=r.item_id ORDER BY pmr.id DESC LIMIT 1) AS merge_landing_id
+        """
         if bin_id:
             rows = conn.execute(
-                """
-                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title
+                f"""
+                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title,
+                  {merge_cols}
                 FROM quarantine_rows r
                 JOIN capture_items i ON i.id=r.item_id
                 JOIN quarantine_bins b ON b.id=r.bin_id
@@ -35,8 +43,9 @@ def list_rows(bin_id: int | None = None, db_path: str | None = None) -> list[dic
             ).fetchall()
         else:
             rows = conn.execute(
-                """
-                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title
+                f"""
+                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title,
+                  {merge_cols}
                 FROM quarantine_rows r
                 JOIN capture_items i ON i.id=r.item_id
                 JOIN quarantine_bins b ON b.id=r.bin_id
@@ -87,6 +96,13 @@ def enter_item(item_id: int, bin_id: int, reason: str, db_path: str | None = Non
         )
         conn.execute(
             "UPDATE capture_items SET status='入舱' WHERE id=?", (item_id,)
+        )
+        conn.execute(
+            """
+            UPDATE page_merge_rows SET row_id=?, bin_id=?
+            WHERE item_id=? AND row_id IS NULL
+            """,
+            (cur.lastrowid, bin_id, item_id),
         )
         n = conn.execute("SELECT COUNT(*) AS c FROM review_tickets").fetchone()["c"] + 1
         conn.execute(

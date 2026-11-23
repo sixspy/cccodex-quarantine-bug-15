@@ -19,8 +19,6 @@ from app.services import review as review_svc
 from app.services import rework as rework_svc
 from app.services import settings as settings_svc
 from app.services import page_merge as page_merge_svc
-from app.services import page_merge_cutover as page_merge_cutover_svc
-from app.services import page_merge_dualwrite as page_merge_dual_svc
 from app.services import sources as sources_svc
 from app.services.errors import ServiceError
 
@@ -311,35 +309,29 @@ def create_app():
 
         def page_merge_dash(request):
             _require(request)
-            return _json(page_merge_cutover_svc.board())
+            return _json(page_merge_svc.dashboard())
 
         def page_merge_commit(request):
             _require(request)
-            body = _read_json(request)
-            return _json(page_merge_svc.commit_action(body))
-
-        def page_merge_half(request):
-            _require(request)
-            return _json(page_merge_svc.reconcile_display())
-
-        def page_merge_snap(request):
-            _require(request)
-            return _json(page_merge_svc.snapshot())
-
-        def page_merge_cutover(request):
-            _require(request)
+            user = _current_user(request)
             body = _read_json(request)
             return _json(
-                page_merge_cutover_svc.append_cutover(
-                    int(body.get("ref_id") or 0),
-                    str(body.get("note") or "分页合并"),
+                page_merge_svc.commit_merge(
+                    int(body.get("batch_id") or 0),
+                    str(body.get("page_key") or ""),
+                    actor=user,
                 )
             )
 
-        def page_merge_dual(request):
+        def page_merge_ledger(request):
             _require(request)
-            body = _read_json(request)
-            return _json(page_merge_dual_svc.apply_dualwrite(str(body.get("note") or "分页合并")))
+            return _json({"items": page_merge_svc.list_merges()})
+
+        def page_merge_rows(request):
+            _require(request)
+            return _json(
+                {"items": page_merge_svc.merge_rows(int(request.matchdict["id"]))}
+            )
 
         def audits_list(request):
             _require(request)
@@ -381,10 +373,8 @@ def create_app():
         config.add_route("audits", "/api/audits")
         config.add_route("page_merge_dash", "/api/page_merge/dash")
         config.add_route("page_merge_commit", "/api/page_merge/commit")
-        config.add_route("page_merge_half", "/api/page_merge/half")
-        config.add_route("page_merge_snap", "/api/page_merge/snap")
-        config.add_route("page_merge_cutover", "/api/page_merge/cutover")
-        config.add_route("page_merge_dual", "/api/page_merge/dual")
+        config.add_route("page_merge_ledger", "/api/page_merge/ledger")
+        config.add_route("page_merge_rows", "/api/page_merge/{id}/rows")
 
 
         config.add_view(root, route_name="root")
@@ -425,10 +415,8 @@ def create_app():
         config.add_view(wrap(audits_list), route_name="audits", request_method="GET")
         config.add_view(wrap(page_merge_dash), route_name="page_merge_dash", request_method="GET")
         config.add_view(wrap(page_merge_commit), route_name="page_merge_commit", request_method="POST")
-        config.add_view(wrap(page_merge_half), route_name="page_merge_half", request_method="POST")
-        config.add_view(wrap(page_merge_snap), route_name="page_merge_snap", request_method="GET")
-        config.add_view(wrap(page_merge_cutover), route_name="page_merge_cutover", request_method="POST")
-        config.add_view(wrap(page_merge_dual), route_name="page_merge_dual", request_method="POST")
+        config.add_view(wrap(page_merge_ledger), route_name="page_merge_ledger", request_method="GET")
+        config.add_view(wrap(page_merge_rows), route_name="page_merge_rows", request_method="GET")
 
 
         return config.make_wsgi_app()

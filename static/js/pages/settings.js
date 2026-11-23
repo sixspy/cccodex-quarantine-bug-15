@@ -31,37 +31,22 @@ export async function renderSettings(el) {
 
   try {
     const dash = await api('/api/page_merge/dash');
+    const spec = dash.spec || {};
     el.innerHTML += `<div class="card" style="margin-top:1rem">
-      <h3>分页合并</h3>
-      <span class="chip">${dash.chip}</span>
-      <p class="muted">读轨 ${dash.active_read} · 切流指纹 ${dash.cutover_fp || '空'} · 拒回刷 ${dash.reject_refresh} · 归档 ${dash.archive_count} · 新旗 ${dash.live_flag || '空'} · 对齐差 ${dash.panel_pack_mismatch}</p>
-      <div class="row">
-        <button id="go_page_merge" type="button">落台</button>
-        <button id="half_page_merge" type="button">半修对齐</button>
-        <button id="cut_page_merge" type="button">切流账册</button>
-        <button id="dual_page_merge" type="button">双写两轨</button>
-      </div>
+      <h3>分页合并口径</h3>
+      <table>
+        <tbody>
+          <tr><td>工程形态</td><td><span class="chip ok">${spec.mode || ''}</span></td></tr>
+          <tr><td>回炉读轨</td><td>${spec.read_track || ''}</td></tr>
+          <tr><td>拒回刷</td><td>${spec.reject_refresh ? '启用' : '停用'}</td></tr>
+          <tr><td>账册笔数</td><td>${spec.merge_count ?? 0}</td></tr>
+          <tr><td>落点行数</td><td>${spec.landing_count ?? 0}</td></tr>
+          <tr><td>最近合并键号</td><td>${spec.latest_merge_key || '无'}</td></tr>
+          <tr><td>最近合并指纹</td><td>${spec.latest_fingerprint || '无'}</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">口径只读：合并落账在抓取批次详情内发起，回炉侧只读账册引用。</p>
     </div>`;
-    const go = el.querySelector('#go_page_merge');
-    if (go) go.onclick = async () => {
-      await api('/api/page_merge/commit', { method:'POST', body: JSON.stringify({ref:1}) });
-      await renderSettings(el);
-    };
-    const half = el.querySelector('#half_page_merge');
-    if (half) half.onclick = async () => {
-      await api('/api/page_merge/half', { method:'POST', body:'{}' });
-      await renderSettings(el);
-    };
-    const cut = el.querySelector('#cut_page_merge');
-    if (cut) cut.onclick = async () => {
-      await api('/api/page_merge/cutover', { method:'POST', body: JSON.stringify({ref_id:1, note:'分页合并'}) });
-      await renderSettings(el);
-    };
-    const dual = el.querySelector('#dual_page_merge');
-    if (dual) dual.onclick = async () => {
-      await api('/api/page_merge/dual', { method:'POST', body: JSON.stringify({note:'分页合并'}) });
-      await renderSettings(el);
-    };
   } catch (e) { /* optional surface */ }
 
 }

@@ -5,9 +5,9 @@ export async function renderBins(el) {
   const rows = await api('/api/rows');
   el.innerHTML = `
     <div class="card">
-      <h2>隔离舱</h2> <span class="chip" data-thick="page_merge">合并已亮</span>
+      <h2>隔离舱</h2>
       <table>
-        <thead><tr><th>舱号</th><th>标题</th><th>状态</th><th>占用/容量</th><th>待复核</th></tr></thead>
+        <thead><tr><th>舱号</th><th>标题</th><th>状态</th><th>占用/容量</th><th>待复核</th><th>合并落点</th></tr></thead>
         <tbody>
           ${(bins.items || []).map((b) => `
             <tr>
@@ -16,6 +16,7 @@ export async function renderBins(el) {
               <td><span class="chip">${b.status}</span></td>
               <td>${b.row_count}/${b.capacity}</td>
               <td>${b.pending_count}</td>
+              <td><span class="chip ${b.landing_count ? 'ok' : ''}">${b.landing_count}</span></td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -23,7 +24,7 @@ export async function renderBins(el) {
     <div class="card">
       <h2>舱内行</h2>
       <table>
-        <thead><tr><th>舱</th><th>条目键</th><th>质量</th><th>原因</th><th>状态</th></tr></thead>
+        <thead><tr><th>舱</th><th>条目键</th><th>质量</th><th>原因</th><th>状态</th><th>合并落点</th></tr></thead>
         <tbody>
           ${(rows.items || []).map((r) => `
             <tr>
@@ -32,6 +33,9 @@ export async function renderBins(el) {
               <td>${r.quality}</td>
               <td>${r.reason}</td>
               <td><span class="chip">${r.status}</span></td>
+              <td>${r.merge_landing_id
+                ? `<span class="chip ok" title="合并键号 ${r.merge_key || ''}">落点#${r.merge_landing_id}</span>`
+                : '<span class="muted">无</span>'}</td>
             </tr>`).join('')}
         </tbody>
       </table>

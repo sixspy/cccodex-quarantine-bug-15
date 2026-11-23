@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.db import get_db
 from app.services import audit as audit_svc
+from app.services import page_merge as page_merge_svc
 from app.services import settings as settings_svc
 from app.services.errors import ServiceError
 
@@ -10,7 +11,15 @@ def list_jobs(db_path: str | None = None) -> list[dict]:
     with get_db(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT j.*, i.item_key, r.reason, b.bin_code
+            SELECT j.*, i.item_key, r.reason, b.bin_code,
+              (
+                SELECT m.merge_key FROM page_merges m
+                WHERE m.batch_id=i.batch_id ORDER BY m.id DESC LIMIT 1
+              ) AS merge_key,
+              (
+                SELECT m.badge FROM page_merges m
+                WHERE m.batch_id=i.batch_id ORDER BY m.id DESC LIMIT 1
+              ) AS merge_badge
             FROM rework_jobs j
             JOIN quarantine_rows r ON r.id=j.row_id
             JOIN capture_items i ON i.id=r.item_id
@@ -31,6 +40,15 @@ def run_job(job_id: int, succeed: bool = True, db_path: str | None = None) -> di
         max_attempt = int(settings_svc.get_value("rework_max_attempt", "3", db_path) or "3")
         if job["attempt"] > max_attempt:
             raise ServiceError("已超过回炉最大次数")
+        row = conn.execute(
+            "SELECT * FROM quarantine_rows WHERE id=?", (job["row_id"],)
+        ).fetchone()
+        item = conn.execute(
+            "SELECT * FROM capture_items WHERE id=?", (row["item_id"],)
+        ).fetchone()
+        page_merge_svc.assert_rework_allowed(conn, item)
+        if succeed:
+            page_merge_svc.assert_release_allowed(conn, item)
         conn.execute(
             """
             UPDATE rework_jobs SET status='执行中', started_at=datetime('now')
@@ -47,9 +65,6 @@ def run_job(job_id: int, succeed: bool = True, db_path: str | None = None) -> di
                 """,
                 (job_id,),
             )
-            row = conn.execute(
-                "SELECT * FROM quarantine_rows WHERE id=?", (job["row_id"],)
-            ).fetchone()
             conn.execute(
                 "UPDATE quarantine_rows SET status='已放行' WHERE id=?", (row["id"],)
             )
@@ -82,6 +97,18 @@ def run_job(job_id: int, succeed: bool = True, db_path: str | None = None) -> di
     return dict(out)
 
 
+def _enqueue(conn, row_id: int, message: str) -> int:
+    n = conn.execute("SELECT COUNT(*) AS c FROM rework_jobs").fetchone()["c"] + 1
+    cur = conn.execute(
+        """
+        INSERT INTO rework_jobs(job_code, row_id, status, message)
+        VALUES (?, ?, '排队', ?)
+        """,
+        (f"RWK-{n:04d}", row_id, message),
+    )
+    return cur.lastrowid
+
+
 def enqueue_from_row(row_id: int, db_path: str | None = None) -> dict:
     with get_db(db_path) as conn:
         row = conn.execute(
@@ -91,6 +118,10 @@ def enqueue_from_row(row_id: int, db_path: str | None = None) -> dict:
             raise ServiceError("隔离行不存在", 404)
         if row["status"] not in ("待复核", "回炉中"):
             raise ServiceError("当前状态不可回炉")
+        item = conn.execute(
+            "SELECT * FROM capture_items WHERE id=?", (row["item_id"],)
+        ).fetchone()
+        page_merge_svc.assert_rework_allowed(conn, item)
         active = conn.execute(
             """
             SELECT id FROM rework_jobs
@@ -100,19 +131,12 @@ def enqueue_from_row(row_id: int, db_path: str | None = None) -> dict:
         ).fetchone()
         if active:
             raise ServiceError("已有进行中的回炉任务")
-        n = conn.execute("SELECT COUNT(*) AS c FROM rework_jobs").fetchone()["c"] + 1
-        cur = conn.execute(
-            """
-            INSERT INTO rework_jobs(job_code, row_id, status, message)
-            VALUES (?, ?, '排队', '手工入回炉队列')
-            """,
-            (f"RWK-{n:04d}", row_id),
-        )
+        job_id = _enqueue(conn, row_id, "手工入回炉队列")
         conn.execute(
             "UPDATE quarantine_rows SET status='回炉中' WHERE id=?", (row_id,)
         )
         conn.execute(
             "UPDATE capture_items SET status='回炉中' WHERE id=?", (row["item_id"],)
         )
-        out = conn.execute("SELECT * FROM rework_jobs WHERE id=?", (cur.lastrowid,)).fetchone()
+        out = conn.execute("SELECT * FROM rework_jobs WHERE id=?", (job_id,)).fetchone()
         return dict(out)

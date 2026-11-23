@@ -4,15 +4,19 @@ export async function renderReview(el) {
   const data = await api('/api/tickets');
   el.innerHTML = `
     <div class="card">
-      <h2>复核放行</h2> <span class="chip" data-thick="page_merge">合并已亮</span>
+      <h2>复核放行</h2>
+      <p class="err" id="err"></p>
       <table>
-        <thead><tr><th>单号</th><th>条目</th><th>舱</th><th>裁决</th><th>操作</th></tr></thead>
+        <thead><tr><th>单号</th><th>条目</th><th>舱</th><th>合并徽标</th><th>裁决</th><th>操作</th></tr></thead>
         <tbody>
           ${(data.items || []).map((t) => `
             <tr>
               <td>${t.ticket_code}</td>
               <td>${t.item_key}</td>
               <td>${t.bin_code}</td>
+              <td>${t.merge_badge
+                ? `<span class="chip ok" title="合并徽标">${t.merge_badge}</span>`
+                : '<span class="muted">未合并</span>'}</td>
               <td><span class="chip">${t.decision}</span></td>
               <td class="row">
                 ${t.decision === '待决' ? `
@@ -27,11 +31,17 @@ export async function renderReview(el) {
     </div>`;
   el.querySelectorAll('button[data-d]').forEach((btn) => {
     btn.onclick = async () => {
-      await api(`/api/tickets/${btn.dataset.id}/decide`, {
-        method: 'POST',
-        body: JSON.stringify({ decision: btn.dataset.d, comment: '台上裁决' }),
-      });
-      await renderReview(el);
+      const err = el.querySelector('#err');
+      err.textContent = '';
+      try {
+        await api(`/api/tickets/${btn.dataset.id}/decide`, {
+          method: 'POST',
+          body: JSON.stringify({ decision: btn.dataset.d, comment: '台上裁决' }),
+        });
+        await renderReview(el);
+      } catch (e) {
+        err.textContent = e.message;
+      }
     };
   });
 }

@@ -6,7 +6,7 @@ export async function renderAudit(el) {
   const sum = data.summary || { total: 0, by_action: [] };
   el.innerHTML = `
     <div class="card">
-      <h2><span class="chip">合并已亮</span> 审计轨迹</h2>
+      <h2>审计轨迹</h2>
       <p class="muted">共 ${sum.total} 条。动作分布：
         ${(sum.by_action || []).map((a) => `${a.action} ${a.c}`).join(' · ') || '暂无'}
       </p>

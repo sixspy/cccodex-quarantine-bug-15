@@ -117,6 +117,30 @@ CREATE TABLE IF NOT EXISTS reconcile_reports (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS page_merges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  merge_key TEXT NOT NULL UNIQUE,
+  batch_id INTEGER NOT NULL REFERENCES capture_batches(id),
+  page_key TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  badge TEXT NOT NULL,
+  actor TEXT NOT NULL DEFAULT 'admin',
+  status TEXT NOT NULL DEFAULT '已落账' CHECK (status IN ('已落账')),
+  landing_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(batch_id, page_key)
+);
+
+CREATE TABLE IF NOT EXISTS page_merge_rows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  merge_id INTEGER NOT NULL REFERENCES page_merges(id),
+  item_id INTEGER NOT NULL REFERENCES capture_items(id),
+  row_id INTEGER REFERENCES quarantine_rows(id),
+  bin_id INTEGER REFERENCES quarantine_bins(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(merge_id, item_id)
+);
+
 CREATE TABLE IF NOT EXISTS lab_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,

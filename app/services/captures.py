@@ -9,8 +9,14 @@ def list_batches(db_path: str | None = None) -> list[dict]:
     with get_db(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT id, batch_code, source_name, status, item_count, bad_count, note, created_at
-            FROM capture_batches ORDER BY id DESC
+            SELECT cb.id, cb.batch_code, cb.source_name, cb.status,
+                   cb.item_count, cb.bad_count, cb.note, cb.created_at,
+              (SELECT m.merge_key FROM page_merges m
+                WHERE m.batch_id=cb.id ORDER BY m.id DESC LIMIT 1) AS merge_key,
+              (SELECT COUNT(*) FROM page_merge_rows pmr
+                JOIN page_merges m2 ON m2.id=pmr.merge_id
+                WHERE m2.batch_id=cb.id) AS merge_landing_count
+            FROM capture_batches cb ORDER BY cb.id DESC
             """
         ).fetchall()
         return [dict(r) for r in rows]
@@ -30,8 +36,16 @@ def get_batch(batch_id: int, db_path: str | None = None) -> dict:
             """,
             (batch_id,),
         ).fetchall()
+        merge = conn.execute(
+            """
+            SELECT merge_key, badge, page_key, fingerprint, landing_count, created_at
+            FROM page_merges WHERE batch_id=? ORDER BY id DESC LIMIT 1
+            """,
+            (batch_id,),
+        ).fetchone()
         data = dict(row)
         data["items"] = [dict(i) for i in items]
+        data["merge"] = dict(merge) if merge else None
         return data
 
 

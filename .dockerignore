@@ -1,8 +1,5 @@
 .venv
-venv
 __pycache__
-*.db
-.git
-instance
 .pytest_cache
-node_modules
+.git
+*.md
